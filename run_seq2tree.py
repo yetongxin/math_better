@@ -12,7 +12,7 @@ if not os.path.exists('error'):
     os.makedirs('error')
 if not os.path.exists('models'):
     os.makedirs('models')
-batch_size = 16
+batch_size = 64
 embedding_size = 512 # todo: 128 linear->512
 hidden_size = 512
 n_epochs = 80
@@ -49,7 +49,7 @@ def writeFile(arr, fold, times):
   f.close()
 
 # test: 从第2个fold开始计算
-for fold in range(2, 5):
+for fold in range(0, 5):
     pairs_tested = []
     pairs_trained = []
     for fold_t in range(5):
@@ -125,7 +125,7 @@ for fold in range(2, 5):
         print("training time", time_since(time.time() - start))
         print("--------------------------------")
         # 0.0452444252413537
-        if (epoch+1) % 10 == 0 or epoch > n_epochs - 5 or pre_accuracy > 0.743:
+        if epoch % 10 == 0 or epoch > n_epochs - 5 or best_accuracy > 0.743:
             evalate_times += 1
             value_ac = 0
             equation_ac = 0

@@ -250,7 +250,7 @@ class EncoderSeq3(nn.Module):
         embedded = self.embedding(input_seqs)  # S x B x E
         embedded = self.em_dropout(embedded)
         # flag:  Seqlen x B x E
-        print(flag.shape, embedded.shape)
+        # print(flag.shape, embedded.shape)
         flag2 = self.speech_liner(flag)
         flag2 = self.speech_dropout(flag2)
 
