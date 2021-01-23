@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+from src.pre_data import flag_dict
 
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, embedding_size, hidden_size, n_layers=2, dropout=0.5):
@@ -184,6 +184,95 @@ class EncoderSeq(nn.Module):
         problem_output = pade_outputs[-1, :, :self.hidden_size] + pade_outputs[0, :, self.hidden_size:]
         pade_outputs = pade_outputs[:, :, :self.hidden_size] + pade_outputs[:, :, self.hidden_size:]  # S x B x H
         return pade_outputs, problem_output
+
+
+class EncoderSeq2(nn.Module):
+    def __init__(self, input_size, embedding_size, hidden_size, n_layers=2, dropout=0.5):
+        super(EncoderSeq2, self).__init__()
+
+        self.input_size = input_size
+        self.embedding_size = embedding_size
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        self.dropout = dropout
+
+        self.embedding = nn.Embedding(input_size, embedding_size, padding_idx=0)
+        self.em_dropout = nn.Dropout(dropout)
+        # self.gru_pade = nn.GRU(embedding_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
+        self.rnn1 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
+        self.rnn2 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
+
+    def forward(self, input_seqs, input_lengths, hidden=None):
+        # Note: we run this all at once (over multiple batches of multiple sequences)
+        embedded = self.embedding(input_seqs)  # S x B x E
+        embedded = self.em_dropout(embedded)
+        # rnn1
+        packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
+        pade_hidden = hidden
+        pade_outputs, pade_hidden = self.rnn1(packed, pade_hidden)
+        pade_outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(pade_outputs)
+        # 叠加
+        outputs1 = pade_outputs[:, :, :self.hidden_size] + pade_outputs[:, :, self.hidden_size:]  # S x B x H
+        # print('outputs1 shape:', outputs1.shape, embedded.shape)
+        outputs1 = outputs1 + embedded
+        # rnn2
+        packed = torch.nn.utils.rnn.pack_padded_sequence(outputs1, input_lengths)
+        pade_outputs, pade_hidden = self.rnn2(packed)
+        pade_outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(pade_outputs)
+
+        problem_output = pade_outputs[-1, :, :self.hidden_size] + pade_outputs[0, :, self.hidden_size:]  # B x H
+        pade_outputs = pade_outputs[:, :, :self.hidden_size] + pade_outputs[:, :, self.hidden_size:]  # S x B x H
+        return pade_outputs, problem_output
+
+
+
+class EncoderSeq3(nn.Module):
+    def __init__(self, input_size, embedding_size, hidden_size, n_layers=2, dropout=0.5):
+        super(EncoderSeq3, self).__init__()
+
+        self.input_size = input_size
+        self.embedding_size = embedding_size
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        self.dropout = dropout
+
+        self.embedding = nn.Embedding(input_size, embedding_size, padding_idx=0)
+        self.em_dropout = nn.Dropout(dropout)
+        # self.gru_pade = nn.GRU(embedding_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
+        self.rnn1 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
+        self.rnn2 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
+
+        self.speech_liner = nn.Linear(len(flag_dict), embedding_size)
+        self.speech_dropout = nn.Dropout(0.5)
+
+    def forward(self, input_seqs, input_lengths, flag, hidden=None):
+        # Note: we run this all at once (over multiple batches of multiple sequences)
+        embedded = self.embedding(input_seqs)  # S x B x E
+        embedded = self.em_dropout(embedded)
+        # flag:  Seqlen x B x E
+        print(flag.shape, embedded.shape)
+        flag2 = self.speech_liner(flag)
+        flag2 = self.speech_dropout(flag2)
+
+        embedded = embedded + flag2
+        # rnn1
+        packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
+        pade_hidden = hidden
+        pade_outputs, pade_hidden = self.rnn1(packed, pade_hidden)
+        pade_outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(pade_outputs)
+        # 叠加
+        outputs1 = pade_outputs[:, :, :self.hidden_size] + pade_outputs[:, :, self.hidden_size:]  # S x B x H
+        # print('outputs1 shape:', outputs1.shape, embedded.shape)
+        outputs1 = outputs1 + embedded
+        # rnn2
+        packed = torch.nn.utils.rnn.pack_padded_sequence(outputs1, input_lengths)
+        pade_outputs, pade_hidden = self.rnn2(packed)
+        pade_outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(pade_outputs)
+
+        problem_output = pade_outputs[-1, :, :self.hidden_size] + pade_outputs[0, :, self.hidden_size:]  # B x H
+        pade_outputs = pade_outputs[:, :, :self.hidden_size] + pade_outputs[:, :, self.hidden_size:]  # S x B x H
+        return pade_outputs, problem_output
+
 
 
 class Prediction(nn.Module):

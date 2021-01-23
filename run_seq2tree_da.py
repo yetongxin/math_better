@@ -10,17 +10,27 @@ from src.expressions_transfer import *
 source_rate = 0.4
 batch_size = 64
 embedding_size = 128
-hidden_size = 512
+hidden_size = 256
 n_epochs = 80
 learning_rate = 1e-3
 weight_decay = 1e-5
 beam_size = 5
 n_layers = 2
 
+def writeFile(arr, fold, times):
+  filename = 'error/' + str(fold) + '-' + str(times) + '.txt'
+  f = open(filename, 'wt')
+  print(arr[0:10])
+  f.writelines(arr)
+  f.close()
+
+
 if not os.path.exists('error'):
     os.makedirs('error')
 if not os.path.exists('models'):
     os.makedirs('models')
+
+
 
 data = load_raw_data("data/Math_23K.json")
 
@@ -87,6 +97,7 @@ for fold in range(5):
     for num in generate_nums:
         generate_num_ids.append(output_lang.word2index[num])
 
+    evalate_times = 0
     for epoch in range(n_epochs):
         encoder_scheduler.step()
         predict_scheduler.step()
@@ -107,11 +118,13 @@ for fold in range(5):
         print("loss:", loss_total / len(input_lengths))
         print("training time", time_since(time.time() - start))
         print("--------------------------------")
-        if epoch % 10 == 0 or epoch > n_epochs - 5:
+        if (epoch+1) % 10 == 0 or epoch > n_epochs - 5:
+            evalate_times += 1
             value_ac = 0
             equation_ac = 0
             eval_total = 0
             start = time.time()
+            # error_list = []
             for test_batch in test_pairs:
                 test_res = evaluate_tree(test_batch[0], test_batch[1], generate_num_ids, encoder, predict, generate,
                                          merge, output_lang, test_batch[5], beam_size=beam_size)
@@ -120,11 +133,15 @@ for fold in range(5):
                     value_ac += 1
                 if equ_ac:
                     equation_ac += 1
+                # if val_ac == False and equ_ac == False:
+                #     tmp = input_lang.index2string(test_batch[0])
+                #     error_list.append(tmp + ' '.join(map(str, gen_res)) + '.real:' + ' '.join(map(str, tar_res)) + '\n')
                 eval_total += 1
             print(equation_ac, value_ac, eval_total)
             print("test_answer_acc", float(equation_ac) / eval_total, float(value_ac) / eval_total)
             print("testing time", time_since(time.time() - start))
             print("------------------------------------------------------")
+            # writeFile(error_list, fold, evalate_times)
             torch.save(encoder.state_dict(), "models/encoder_da")
             torch.save(predict.state_dict(), "models/predict_da")
             torch.save(generate.state_dict(), "models/generate_da")

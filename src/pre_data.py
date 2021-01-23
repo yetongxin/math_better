@@ -3,10 +3,65 @@ import json
 import copy
 import re
 
+import torch.nn.functional as F
+import torch
 
 PAD_token = 0
+FLAG_SIZE = 60
 
-
+flag_dict = {'a': 15,
+ 'ad': 32,
+ 'ag': 48,
+ 'an': 43,
+ 'b': 3,
+ 'c': 19,
+ 'd': 7,
+ 'e': 51,
+ 'eng': 28,
+ 'f': 11,
+ 'g': 47,
+ 'i': 18,
+ 'j': 12,
+ 'k': 9,
+ 'l': 22,
+ 'm': 6,
+ 'mg': 37,
+ 'mq': 30,
+ 'n': 2,
+ 'ng': 21,
+ 'nr': 17,
+ 'nrfg': 39,
+ 'nrt': 31,
+ 'ns': 1,
+ 'nt': 35,
+ 'nz': 29,
+ 'o': 46,
+ 'p': 16,
+ 'pad': 0,
+ 'q': 13,
+ 'r': 14,
+ 'rr': 49,
+ 'rz': 40,
+ 's': 34,
+ 't': 26,
+ 'tg': 42,
+ 'u': 27,
+ 'ud': 25,
+ 'ug': 38,
+ 'uj': 4,
+ 'ul': 10,
+ 'uv': 33,
+ 'uz': 36,
+ 'v': 5,
+ 'vd': 50,
+ 'vg': 41,
+ 'vn': 24,
+ 'vq': 52,
+ 'x': 8,
+ 'y': 45,
+ 'yg': 44,
+ 'z': 23,
+ 'zg': 20}
 class Lang:
     """
     class to save the vocab and two dict: the word->index and index->word
@@ -79,7 +134,11 @@ class Lang:
         for i, j in enumerate(self.index2word):
             self.word2index[j] = i
 
-
+    def index2string(self, src):
+        if 'PAD' in self.word2index:
+            return [self.index2word[index] for index in src if index != self.word2index['PAD']]
+        else:
+            return [self.index2word[index] for index in src]
 def load_raw_data(filename):  # load the json data to list(dict()) for MATH 23K
     print("Reading lines...")
     f = open(filename, encoding="utf-8")
@@ -88,7 +147,7 @@ def load_raw_data(filename):  # load the json data to list(dict()) for MATH 23K
     for i, s in enumerate(f):
         js += s
         i += 1
-        if i % 7 == 0:  # every 7 line is a json
+        if i % 8 == 0:  # every 7 line is a json
             data_d = json.loads(js)
             if "千米/小时" in data_d["equation"]:
                 data_d["equation"] = data_d["equation"][:-5]
@@ -277,6 +336,7 @@ def transfer_num(data):  # transfer num into "NUM"
         nums = []
         input_seq = []
         seg = d["segmented_text"].strip().split(" ")
+        flag = d["flag"].strip().split(" ")
         equations = d["equation"][2:]
 
         for s in seg:
@@ -345,7 +405,7 @@ def transfer_num(data):  # transfer num into "NUM"
                 num_pos.append(i)
         assert len(nums) == len(num_pos)
         # pairs.append((input_seq, out_seq, nums, num_pos, d["ans"]))
-        pairs.append([input_seq, out_seq, nums, num_pos])
+        pairs.append([input_seq, out_seq, nums, num_pos, flag])
 
     temp_g = []
     for g in generate_nums:
@@ -668,7 +728,7 @@ def prepare_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, cop
         # train_pairs.append((input_cell, len(input_cell), output_cell, len(output_cell),
         #                     pair[2], pair[3], num_stack, pair[4]))
         train_pairs.append([input_cell, len(input_cell), output_cell, len(output_cell),
-                            pair[2], pair[3], num_stack])
+                            pair[2], pair[3], num_stack, pair[4]])
     print('Indexed %d words in input language, %d words in output' % (input_lang.n_words, output_lang.n_words))
     print('Number of training data %d' % (len(train_pairs)))
     for pair in pairs_tested:
@@ -693,7 +753,7 @@ def prepare_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, cop
         # train_pairs.append((input_cell, len(input_cell), output_cell, len(output_cell),
         #                     pair[2], pair[3], num_stack, pair[4]))
         test_pairs.append([input_cell, len(input_cell), output_cell, len(output_cell),
-                           pair[2], pair[3], num_stack])
+                           pair[2], pair[3], num_stack, pair[4]])
     print('Number of testind data %d' % (len(test_pairs)))
     return input_lang, output_lang, train_pairs, test_pairs
 
@@ -735,7 +795,7 @@ def prepare_da_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, 
         num_stack.reverse()
         input_cell = indexes_from_sentence(input_lang, pair[0])
         # train_pairs.append([input_cell, len(input_cell), pair[1], 0, pair[2], pair[3], num_stack, pair[4]])
-        train_pairs.append([input_cell, len(input_cell), pair[1], 0, pair[2], pair[3], num_stack])
+        train_pairs.append([input_cell, len(input_cell), pair[1], 0, pair[2], pair[3], num_stack, pair[4]])
     print('Indexed %d words in input language, %d words in output' % (input_lang.n_words, output_lang.n_words))
     print('Number of training data %d' % (len(train_pairs)))
     for pair in pairs_tested:
@@ -796,6 +856,11 @@ def pad_seq(seq, seq_len, max_length):
     seq += [PAD_token for _ in range(max_length - seq_len)]
     return seq
 
+def to_one_hot(arr, seq_len, max_len):
+    arr += ['pad' for _ in range(max_len - seq_len)]
+    arr = torch.Tensor([flag_dict[item] for item in arr]).to(torch.int64)
+    arr = F.one_hot(arr, num_classes=len(flag_dict)).numpy()
+    return arr
 
 # prepare the batches
 def prepare_train_batch(pairs_to_batch, batch_size):
@@ -811,6 +876,7 @@ def prepare_train_batch(pairs_to_batch, batch_size):
     num_stack_batches = []  # save the num stack which
     num_pos_batches = []
     num_size_batches = []
+    flag_batches = []
     while pos + batch_size < len(pairs):
         batches.append(pairs[pos:pos+batch_size])
         pos += batch_size
@@ -820,7 +886,7 @@ def prepare_train_batch(pairs_to_batch, batch_size):
         batch = sorted(batch, key=lambda tp: tp[1], reverse=True)
         input_length = []
         output_length = []
-        for _, i, _, j, _, _, _ in batch:
+        for _, i, _, j, _, _, _, _ in batch:
             input_length.append(i)
             output_length.append(j)
         input_lengths.append(input_length)
@@ -833,20 +899,23 @@ def prepare_train_batch(pairs_to_batch, batch_size):
         num_stack_batch = []
         num_pos_batch = []
         num_size_batch = []
-        for i, li, j, lj, num, num_pos, num_stack in batch:
+        flag_batch = []
+        for i, li, j, lj, num, num_pos, num_stack, flag in batch:
             num_batch.append(len(num))
             input_batch.append(pad_seq(i, li, input_len_max))
             output_batch.append(pad_seq(j, lj, output_len_max))
             num_stack_batch.append(num_stack)
             num_pos_batch.append(num_pos)
             num_size_batch.append(len(num_pos))
+            flag_batch.append(to_one_hot(flag, li, input_len_max))
         input_batches.append(input_batch)
         nums_batches.append(num_batch)
         output_batches.append(output_batch)
         num_stack_batches.append(num_stack_batch)
         num_pos_batches.append(num_pos_batch)
         num_size_batches.append(num_size_batch)
-    return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches
+        flag_batches.append(flag_batch)
+    return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches, flag_batches
 
 
 def get_num_stack(eq, output_lang, num_pos):
@@ -894,6 +963,7 @@ def get_all_eq(prefix_seq, ops, ex_ops):
 
 
 def prepare_ex_train_batch(pairs_to_batch, batch_size, output_lang, source_rate=0.4):
+    print(pairs_to_batch[0])
     pairs = copy.deepcopy(pairs_to_batch)
     random.shuffle(pairs)  # shuffle the pairs
     pos = 0
@@ -922,11 +992,21 @@ def prepare_ex_train_batch(pairs_to_batch, batch_size, output_lang, source_rate=
     for o in ["+", "*", "-", "/", "^"]:
         if o in output_lang.word2index:
             ops.append(output_lang.word2index[o])
-
+    print(output_lang.index2word)
+    print('exops', ex_ops, 'ops', ops)
+    print_times = 0
     for batch in batches:
         ex_batch = []
-        for bidx, b in enumerate(batch):
-            ex_batch += [(bidx, x) for x in get_all_eq(b[2], ops, ex_ops)]
+        for bidx, pair in enumerate(batch):
+            tmp = [(bidx, x) for x in get_all_eq(pair[2], ops, ex_ops)]
+            ex_batch += tmp
+            if print_times < 10:
+                print_times+=1
+                print('bidx, b:', bidx, pair)
+                print('exbatch:', tmp)
+                print('original:', output_lang.index2string(pair[2]))
+                for tup in tmp:
+                    print(output_lang.index2string(tup[1]))
         if len(ex_batch) > generate_batch_size:
             ex_batch = random.sample(ex_batch, generate_batch_size)
 
