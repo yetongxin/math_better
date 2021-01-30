@@ -134,6 +134,7 @@ for fold in range(0, 5):
             error_list = []
             for test_batch in test_pairs:
                 # test_batch: (input_sentence_index, len(input_sentecnce), output_sentence_index, len(output_sentence), nums, num_pos, num_stack, flag)
+                # print('evaluate tree', test_batch[7], to_one_hot(test_batch[7], len(test_batch[7]), len(test_batch[7])))
                 test_res = evaluate_tree(test_batch[0], test_batch[1], generate_num_ids, encoder, predict, generate,
                                          merge, output_lang, test_batch[5], flag_batch=to_one_hot(test_batch[7], len(test_batch[7]), len(test_batch[7])), beam_size=beam_size)
                 val_ac, equ_ac, gen_res, tar_res = compute_prefix_tree_result(test_res, test_batch[2], output_lang, test_batch[4], test_batch[6])

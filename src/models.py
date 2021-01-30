@@ -245,7 +245,9 @@ class EncoderSeq3(nn.Module):
         self.speech_liner = nn.Linear(len(flag_dict), embedding_size)
         self.speech_dropout = nn.Dropout(0.5)
 
-    def forward(self, input_seqs, input_lengths, flag, hidden=None):
+    def forward(self, input_seqs, input_lengths, flag, evaluating=False,hidden=None):
+        # if evaluating:
+        #   print('evaluating mode:', input_seqs, input_seqs.shape, input_lengths, flag.shape)
         # Note: we run this all at once (over multiple batches of multiple sequences)
         embedded = self.embedding(input_seqs)  # S x B x E
         embedded = self.em_dropout(embedded)

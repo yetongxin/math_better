@@ -136,9 +136,9 @@ class Lang:
 
     def index2string(self, src):
         if 'PAD' in self.word2index:
-            return [self.index2word[index] for index in src if index != self.word2index['PAD']]
+            return ' '.join([self.index2word[index] for index in src if index != self.word2index['PAD']])
         else:
-            return [self.index2word[index] for index in src]
+            return ' '.join([self.index2word[index] for index in src])
 def load_raw_data(filename):  # load the json data to list(dict()) for MATH 23K
     print("Reading lines...")
     f = open(filename, encoding="utf-8")
