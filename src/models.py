@@ -242,19 +242,26 @@ class EncoderSeq3(nn.Module):
         self.rnn1 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
         self.rnn2 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
 
-        self.speech_liner = nn.Linear(len(flag_dict), embedding_size)
+        # self.speech_liner = nn.Linear(len(flag_dict), embedding_size)
+        self.speech_liner = nn.Linear(len(flag_dict) + embedding_size, embedding_size)
         self.speech_dropout = nn.Dropout(0.5)
 
-    def forward(self, input_seqs, input_lengths, flag, hidden=None):
+    def forward(self, input_seqs, input_lengths, flag, evaluating=False,hidden=None):
+        # if evaluating:
+        #   print('evaluating mode:', input_seqs, input_seqs.shape, input_lengths, flag.shape)
         # Note: we run this all at once (over multiple batches of multiple sequences)
         embedded = self.embedding(input_seqs)  # S x B x E
-        embedded = self.em_dropout(embedded)
+        # embedded = self.em_dropout(embedded)
+
+        tmp = torch.cat([embedded, flag], 2)
+        embedded = self.speech_liner(tmp)
+        # embedded = self.speech_dropout(embedded)
         # flag:  Seqlen x B x E
         # print(flag.shape, embedded.shape)
-        flag2 = self.speech_liner(flag)
-        flag2 = self.speech_dropout(flag2)
+        # flag2 = self.speech_liner(flag)
+        # flag2 = self.speech_dropout(flag2) # S x B x len(dict)
 
-        embedded = embedded + flag2
+        # embedded = embedded + flag2
         # rnn1
         packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
         pade_hidden = hidden

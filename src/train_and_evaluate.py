@@ -778,7 +778,6 @@ def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, ge
     # Turn padded arrays into (batch_size x max_len) tensors, transpose into (max_len x batch_size)
     input_var = torch.LongTensor(input_batch).unsqueeze(1)
     flag_var = torch.Tensor(flag_batch).unsqueeze(1)
-
     num_mask = torch.ByteTensor(1, len(num_pos) + len(generate_nums)).fill_(0)
 
     # Set to not-training mode to disable dropout
@@ -796,10 +795,10 @@ def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, ge
         seq_mask = seq_mask.cuda()
         padding_hidden = padding_hidden.cuda()
         num_mask = num_mask.cuda()
-        flag_var = flag_var.cuda
+        flag_var = flag_var.cuda()
     # Run words through encoder
 
-    encoder_outputs, problem_output = encoder(input_var, [input_length], flag_var)
+    encoder_outputs, problem_output = encoder(input_var, [input_length], flag_var, evaluating=True)
 
     # Prepare input and output variables
     node_stacks = [[TreeNode(_)] for _ in problem_output.split(1, dim=0)]
