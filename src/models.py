@@ -255,6 +255,7 @@ class EncoderSeq3(nn.Module):
 
         tmp = torch.cat([embedded, flag], 2)
         embedded = self.speech_liner(tmp)
+        embedded = self.em_dropout(embedded)
         # embedded = self.speech_dropout(embedded)
         # flag:  Seqlen x B x E
         # print(flag.shape, embedded.shape)

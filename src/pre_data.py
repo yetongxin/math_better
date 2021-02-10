@@ -61,7 +61,8 @@ flag_dict = {'a': 15,
  'y': 45,
  'yg': 44,
  'z': 23,
- 'zg': 20}
+ 'zg': 20,
+ 'unk': 53}
 class Lang:
     """
     class to save the vocab and two dict: the word->index and index->word
@@ -725,10 +726,18 @@ def prepare_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, cop
         num_stack.reverse()
         input_cell = indexes_from_sentence(input_lang, pair[0])
         output_cell = indexes_from_sentence(output_lang, pair[1], tree)
+        # processed_except_flag = get_real_flag(input_lang, pair[4])
+        tmp_flag = []
+        for i in range(len(input_cell)):
+            if input_cell[i] == input_lang.word2index['UNK']:
+                tmp_flag.append('unk')
+                print('unk触发')
+            else:
+                tmp_flag.append(pair[4][i])
         # train_pairs.append((input_cell, len(input_cell), output_cell, len(output_cell),
         #                     pair[2], pair[3], num_stack, pair[4]))
         train_pairs.append([input_cell, len(input_cell), output_cell, len(output_cell),
-                            pair[2], pair[3], num_stack, pair[4]])
+                            pair[2], pair[3], num_stack, tmp_flag])
     print('Indexed %d words in input language, %d words in output' % (input_lang.n_words, output_lang.n_words))
     print('Number of training data %d' % (len(train_pairs)))
     for pair in pairs_tested:
@@ -750,10 +759,18 @@ def prepare_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, cop
         num_stack.reverse()
         input_cell = indexes_from_sentence(input_lang, pair[0])
         output_cell = indexes_from_sentence(output_lang, pair[1], tree)
+
+        tmp_flag = []
+        for i in range(len(input_cell)):
+            if input_cell[i] == input_lang.word2index['UNK']:
+                tmp_flag.append('unk')
+                print('unk触发')
+            else:
+                tmp_flag.append(pair[4][i])
         # train_pairs.append((input_cell, len(input_cell), output_cell, len(output_cell),
         #                     pair[2], pair[3], num_stack, pair[4]))
         test_pairs.append([input_cell, len(input_cell), output_cell, len(output_cell),
-                           pair[2], pair[3], num_stack, pair[4]])
+                           pair[2], pair[3], num_stack, tmp_flag])
     print('Number of testind data %d' % (len(test_pairs)))
     return input_lang, output_lang, train_pairs, test_pairs
 
