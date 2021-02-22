@@ -68,7 +68,7 @@ for fold in range(0, 5):
     set_input_lang(input_lang)
     set_output_lang(output_lang)
     # Initialize models
-    encoder = EncoderSeq3(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size,
+    encoder = EncoderSeq4(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size, char_vocab=input_lang.char_vocab,
                          n_layers=n_layers)
     # encoder = EncoderRNNAttn(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size,
     #                          n_layers=n_layers, dropout=0.5, d_ff=2048, N=1)

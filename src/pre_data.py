@@ -5,6 +5,7 @@ import re
 
 import torch.nn.functional as F
 import torch
+from fastNLP import Vocabulary
 
 PAD_token = 0
 FLAG_SIZE = 60
@@ -72,9 +73,12 @@ class Lang:
         self.index2word = []
         self.n_words = 0  # Count word tokens
         self.num_start = 0
+        self.char_vocab = Vocabulary(min_freq=5, padding='PAD', unknown='UNK')
+        self.char_vocab.add_word('NUM')
 
     def add_sen_to_vocab(self, sentence):  # add words of sentence to vocab
         for word in sentence:
+            self.char_vocab.add_word(word)
             if re.search("N\d+|NUM|\d+", word):
                 continue
             if word not in self.index2word:
@@ -84,6 +88,7 @@ class Lang:
                 self.n_words += 1
             else:
                 self.word2count[word] += 1
+        # self.char_vocab.add_word_lst(sentence)
 
     def trim(self, min_count):  # trim words below a certain count threshold
         keep_words = []
@@ -117,6 +122,11 @@ class Lang:
         self.n_words = len(self.index2word)
         for i, j in enumerate(self.index2word):
             self.word2index[j] = i
+
+        # 使用fastnlp
+        self.index2word = self.char_vocab._idx2word
+        self.word2index = self.char_vocab._word2idx
+        self.n_words = len(self.index2word)
 
     def build_output_lang(self, generate_num, copy_nums):  # build the output lang vocab and dict
         self.index2word = ["PAD", "EOS"] + self.index2word + generate_num + ["N" + str(i) for i in range(copy_nums)] +\
@@ -677,10 +687,13 @@ def indexes_from_sentence(lang, sentence, tree=False):
     for word in sentence:
         if len(word) == 0:
             continue
-        if word in lang.word2index:
-            res.append(lang.word2index[word])
+        if not tree:
+            res.append(lang.char_vocab.to_index(word))
         else:
-            res.append(lang.word2index["UNK"])
+            if word in lang.word2index:
+                res.append(lang.word2index[word])
+            else:
+                res.append(lang.word2index["UNK"])
     if "EOS" in lang.index2word and not tree:
         res.append(lang.word2index["EOS"])
     return res
@@ -1045,92 +1058,6 @@ def prepare_ex_train_batch(pairs_to_batch, batch_size, output_lang, source_rate=
         num_pos_batches.append(num_pos_batch)
         num_size_batches.append(num_size_batch)
     return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches
-
-
-def prepare_da_train_batch(pairs_to_batch, batch_size, output_lang, rate, english=False):
-    pairs = []
-    b_pairs = copy.deepcopy(pairs_to_batch)
-    for pair in b_pairs:
-        p = copy.deepcopy(pair)
-        pair[2] = check_bracket(pair[2], english)
-
-        temp_out = exchange(pair[2], rate)
-        temp_out = check_bracket(temp_out, english)
-
-        p[2] = indexes_from_sentence(output_lang, pair[2])
-        p[3] = len(p[2])
-        pairs.append(p)
-
-        temp_out_a = allocation(pair[2], rate)
-        temp_out_a = check_bracket(temp_out_a, english)
-
-        if temp_out_a != pair[2]:
-            p = copy.deepcopy(pair)
-            p[6] = get_num_stack(temp_out_a, output_lang, p[4])
-            p[2] = indexes_from_sentence(output_lang, temp_out_a)
-            p[3] = len(p[2])
-            pairs.append(p)
-
-        if temp_out != pair[2]:
-            p = copy.deepcopy(pair)
-            p[6] = get_num_stack(temp_out, output_lang, p[4])
-            p[2] = indexes_from_sentence(output_lang, temp_out)
-            p[3] = len(p[2])
-            pairs.append(p)
-
-            if temp_out_a != pair[2]:
-                p = copy.deepcopy(pair)
-                temp_out_a = allocation(temp_out, rate)
-                temp_out_a = check_bracket(temp_out_a, english)
-                if temp_out_a != temp_out:
-                    p[6] = get_num_stack(temp_out_a, output_lang, p[4])
-                    p[2] = indexes_from_sentence(output_lang, temp_out_a)
-                    p[3] = len(p[2])
-                    pairs.append(p)
-    print("this epoch training data is", len(pairs))
-    random.shuffle(pairs)  # shuffle the pairs
-    pos = 0
-    input_lengths = []
-    output_lengths = []
-    nums_batches = []
-    batches = []
-    input_batches = []
-    output_batches = []
-    num_stack_batches = []  # save the num stack which
-    num_pos_batches = []
-    while pos + batch_size < len(pairs):
-        batches.append(pairs[pos:pos+batch_size])
-        pos += batch_size
-    batches.append(pairs[pos:])
-
-    for batch in batches:
-        batch = sorted(batch, key=lambda tp: tp[1], reverse=True)
-        input_length = []
-        output_length = []
-        for _, i, _, j, _, _, _ in batch:
-            input_length.append(i)
-            output_length.append(j)
-        input_lengths.append(input_length)
-        output_lengths.append(output_length)
-        input_len_max = input_length[0]
-        output_len_max = max(output_length)
-        input_batch = []
-        output_batch = []
-        num_batch = []
-        num_stack_batch = []
-        num_pos_batch = []
-        for i, li, j, lj, num, num_pos, num_stack in batch:
-            num_batch.append(len(num))
-            input_batch.append(pad_seq(i, li, input_len_max))
-            output_batch.append(pad_seq(j, lj, output_len_max))
-            num_stack_batch.append(num_stack)
-            num_pos_batch.append(num_pos)
-        input_batches.append(input_batch)
-        nums_batches.append(num_batch)
-        output_batches.append(output_batch)
-        num_stack_batches.append(num_stack_batch)
-        num_pos_batches.append(num_pos_batch)
-    return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches
 
 
 # Multiplication exchange rate
