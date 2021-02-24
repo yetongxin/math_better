@@ -13,8 +13,8 @@ if not os.path.exists('error'):
 if not os.path.exists('models'):
     os.makedirs('models')
 batch_size = 64
-embedding_size = 512 # todo: 128 linear->512
-hidden_size = 512
+embedding_size = 768 # 512 # todo: 128 linear->512
+hidden_size = 768
 n_epochs = 80
 learning_rate = 1e-3
 weight_decay = 1e-5
@@ -61,6 +61,9 @@ for fold in range(0, 5):
     print('pair_tested len:', len(pairs_tested), pairs_tested[0])
     input_lang, output_lang, train_pairs, test_pairs = prepare_data(pairs_trained, pairs_tested, 5, generate_nums,
                                                                     copy_nums, tree=True)
+    print('input lang word2index', input_lang.word2index)
+    print('output lang word2index', output_lang.word2index)
+
     print(test_pairs[0], 'flag:', test_pairs[0][7], 'one hot value:', to_one_hot(test_pairs[0][7], len(test_pairs[0][7]),  len(test_pairs[0][7])),
           'input shape', torch.LongTensor(test_pairs[0][0]).unsqueeze(1).shape,
           'onehot:', torch.Tensor(to_one_hot(test_pairs[0][7], len(test_pairs[0][7]),  len(test_pairs[0][7]))).unsqueeze(1).shape,
@@ -125,7 +128,7 @@ for fold in range(0, 5):
         print("training time", time_since(time.time() - start))
         print("--------------------------------")
         # 0.0452444252413537
-        if epoch % 10 == 0 or epoch > n_epochs - 5 or best_accuracy > 0.743:
+        if epoch % 5 == 0 or epoch > n_epochs - 5 or best_accuracy > 0.743:
             evalate_times += 1
             value_ac = 0
             equation_ac = 0

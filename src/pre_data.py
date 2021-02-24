@@ -74,13 +74,13 @@ class Lang:
         self.n_words = 0  # Count word tokens
         self.num_start = 0
         self.char_vocab = Vocabulary(min_freq=5, padding='PAD', unknown='UNK')
-        self.char_vocab.add_word('NUM')
+        # self.char_vocab.add_word('NUM')
 
     def add_sen_to_vocab(self, sentence):  # add words of sentence to vocab
         for word in sentence:
             self.char_vocab.add_word(word)
-            if re.search("N\d+|NUM|\d+", word):
-                continue
+            # if re.search("N\d+|NUM|\d+", word):
+            #     continue
             if word not in self.index2word:
                 self.word2index[word] = self.n_words
                 self.word2count[word] = 1
@@ -113,15 +113,15 @@ class Lang:
             self.n_words += 1
 
     def build_input_lang(self, trim_min_count):  # build the input lang vocab and dict
-        if trim_min_count > 0:
-            self.trim(trim_min_count)
-            self.index2word = ["PAD", "NUM", "UNK"] + self.index2word
-        else:
-            self.index2word = ["PAD", "NUM"] + self.index2word
-        self.word2index = {}
-        self.n_words = len(self.index2word)
-        for i, j in enumerate(self.index2word):
-            self.word2index[j] = i
+        # if trim_min_count > 0:
+        #     self.trim(trim_min_count)
+        #     self.index2word = ["PAD", "NUM", "UNK"] + self.index2word
+        # else:
+        #     self.index2word = ["PAD", "NUM"] + self.index2word
+        # self.word2index = {}
+        # self.n_words = len(self.index2word)
+        # for i, j in enumerate(self.index2word):
+        #     self.word2index[j] = i
 
         # 使用fastnlp
         self.index2word = self.char_vocab._idx2word
@@ -348,16 +348,20 @@ def transfer_num(data):  # transfer num into "NUM"
         seg = d["segmented_text"].strip().split(" ")
         flag = d["flag"].strip().split(" ")
         equations = d["equation"][2:]
+        num_pos = []
 
-        for s in seg:
+        for idx in range(len(seg)):
+            s = seg[idx]
+            input_seq.append(s)
             pos = re.search(pattern, s)
             if pos and pos.start() == 0:
                 nums.append(s[pos.start(): pos.end()])
-                input_seq.append("NUM")
-                if pos.end() < len(s):
-                    input_seq.append(s[pos.end():])
-            else:
-                input_seq.append(s)
+                num_pos.append(idx)
+            #     input_seq.append("NUM")
+            #     if pos.end() < len(s):
+            #         input_seq.append(s[pos.end():])
+            # else:
+            #     input_seq.append(s)
         if copy_nums < len(nums):
             copy_nums = len(nums)
 
@@ -409,11 +413,11 @@ def transfer_num(data):  # transfer num into "NUM"
             if s in generate_nums and s not in nums:
                 generate_nums_dict[s] = generate_nums_dict[s] + 1
 
-        num_pos = []
-        for i, j in enumerate(input_seq):
-            if j == "NUM":
-                num_pos.append(i)
-        assert len(nums) == len(num_pos)
+        # num_pos = []
+        # for i, j in enumerate(input_seq):
+        #     if j == "NUM":
+        #         num_pos.append(i)
+        # assert len(nums) == len(num_pos)
         # pairs.append((input_seq, out_seq, nums, num_pos, d["ans"]))
         pairs.append([input_seq, out_seq, nums, num_pos, flag])
 
@@ -423,7 +427,7 @@ def transfer_num(data):  # transfer num into "NUM"
             temp_g.append(g)
     return pairs, temp_g, copy_nums
 
-
+"""
 def transfer_english_num(data):  # transfer num into "NUM"
     print("Transfer numbers...")
     pattern = re.compile("\d+,\d+|\d+\.\d+|\d+")
@@ -550,8 +554,9 @@ def transfer_english_num(data):  # transfer num into "NUM"
             temp_g.append(g)
 
     return pairs, temp_g, copy_nums
+"""
 
-
+"""
 def transfer_roth_num(data):  # transfer num into "NUM"
     print("Transfer numbers...")
     pattern = re.compile("\d+,\d+|\d+\.\d+|\d+")
@@ -679,8 +684,7 @@ def transfer_roth_num(data):  # transfer num into "NUM"
             temp_g.append(g)
 
     return pairs, temp_g, copy_nums
-
-
+"""
 # Return a list of indexes, one for each word in the sentence, plus EOS
 def indexes_from_sentence(lang, sentence, tree=False):
     res = []

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from src.pre_data import flag_dict
-from fastNLP.embeddings import CNNCharEmbedding, StaticEmbedding, StackEmbedding
+from fastNLP.embeddings import CNNCharEmbedding, StaticEmbedding, StackEmbedding, LSTMCharEmbedding, BertEmbedding
 # from fastNLP import Vocabulary
 
 
@@ -289,11 +289,13 @@ class EncoderSeq4(nn.Module):
         self.dropout = dropout
 
         # self.embedding = nn.Embedding(input_size, embedding_size, padding_idx=0)
-        self.word_embedding = StaticEmbedding(char_vocab, model_dir_or_name=None, embedding_dim=embedding_size/2)
-        self.char_embedding = CNNCharEmbedding(char_vocab, embed_size=embedding_size/2, char_emb_size=50)
-        self.stackEmbed = StackEmbedding([self.word_embedding, self.char_embedding])
-
-        self.em_dropout = nn.Dropout(dropout)
+        print('char vocab', char_vocab, embedding_size//2)
+        # self.word_embedding = StaticEmbedding(char_vocab, model_dir_or_name=None, embedding_dim=embedding_size//2)
+        # self.char_embedding = CNNCharEmbedding(char_vocab, embed_size=embedding_size//2, char_emb_size=256)
+        # self.stackEmbed = StackEmbedding([self.word_embedding, self.char_embedding])
+        self.embed = BertEmbedding(char_vocab, model_dir_or_name='cn-base', requires_grad=False)
+        # self.embed_linear = nn.Linear()
+        # self.em_dropout = nn.Dropout(dropout)
         # self.gru_pade = nn.GRU(embedding_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
         self.rnn1 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
         self.rnn2 = nn.LSTM(embedding_size, hidden_size, num_layers=2, dropout=dropout, bidirectional=True)
@@ -305,8 +307,8 @@ class EncoderSeq4(nn.Module):
         # if evaluating:
         #   print('evaluating mode:', input_seqs, input_seqs.shape, input_lengths, flag.shape)
         # Note: we run this all at once (over multiple batches of multiple sequences)
-        embedded = self.stackEmbed(input_seqs)  # S x B x E
-        embedded = self.em_dropout(embedded)
+        embedded = self.embed(input_seqs)  # S x B x E
+        # embedded = self.em_dropout(embedded)
         # char_embedded =
         # flag:  Seqlen x B x E
         # print(flag.shape, embedded.shape)
