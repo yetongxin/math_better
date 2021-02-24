@@ -124,6 +124,9 @@ class Lang:
         #     self.word2index[j] = i
 
         # 使用fastnlp
+        self.char_vocab.build_vocab()
+        print('_word2idx', self.char_vocab._word2idx)
+        self.char_vocab.build_reverse_vocab()
         self.index2word = self.char_vocab._idx2word
         self.word2index = self.char_vocab._word2idx
         self.n_words = len(self.index2word)
@@ -717,6 +720,7 @@ def prepare_data(pairs_trained, pairs_tested, trim_min_count, generate_nums, cop
         elif pair[-1]:
             input_lang.add_sen_to_vocab(pair[0])
             output_lang.add_sen_to_vocab(pair[1])
+    print('input_lang', input_lang.char_vocab)
     input_lang.build_input_lang(trim_min_count)
     if tree:
         output_lang.build_output_lang_for_tree(generate_nums, copy_nums)
