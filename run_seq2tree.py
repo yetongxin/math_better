@@ -13,15 +13,15 @@ if not os.path.exists('error'):
 if not os.path.exists('models'):
     os.makedirs('models')
 batch_size = 64
-embedding_size = 768 # 512 # todo: 128 linear->512
-hidden_size = 768
+embedding_size = 512 # 512 # todo: 128 linear->512
+hidden_size = 512
 n_epochs = 80
 learning_rate = 1e-3
 weight_decay = 1e-5
 beam_size = 5
 n_layers = 2
 
-data = load_raw_data("data/math23k-processed.json")
+data = load_raw_data("data/math23k-processed.json", 8)
 
 pairs, generate_nums, copy_nums = transfer_num(data)
 

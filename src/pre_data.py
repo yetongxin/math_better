@@ -78,9 +78,11 @@ class Lang:
 
     def add_sen_to_vocab(self, sentence):  # add words of sentence to vocab
         for word in sentence:
+            # self.char_vocab.add_word(word)
+            if re.search("N\d+|NUM|\d+", word):
+                self.char_vocab.add_word('NUM')
+                continue
             self.char_vocab.add_word(word)
-            # if re.search("N\d+|NUM|\d+", word):
-            #     continue
             if word not in self.index2word:
                 self.word2index[word] = self.n_words
                 self.word2count[word] = 1
@@ -125,11 +127,13 @@ class Lang:
 
         # 使用fastnlp
         self.char_vocab.build_vocab()
+        print('all words count', len(self.char_vocab.word_count.keys()), self.char_vocab.word_count)
         print('_word2idx', self.char_vocab._word2idx)
         self.char_vocab.build_reverse_vocab()
         self.index2word = self.char_vocab._idx2word
         self.word2index = self.char_vocab._word2idx
         self.n_words = len(self.index2word)
+        print('input lang n_words', self.n_words)
 
     def build_output_lang(self, generate_num, copy_nums):  # build the output lang vocab and dict
         self.index2word = ["PAD", "EOS"] + self.index2word + generate_num + ["N" + str(i) for i in range(copy_nums)] +\
@@ -152,7 +156,7 @@ class Lang:
             return ' '.join([self.index2word[index] for index in src if index != self.word2index['PAD']])
         else:
             return ' '.join([self.index2word[index] for index in src])
-def load_raw_data(filename):  # load the json data to list(dict()) for MATH 23K
+def load_raw_data(filename, num=8):  # load the json data to list(dict()) for MATH 23K
     print("Reading lines...")
     f = open(filename, encoding="utf-8")
     js = ""
@@ -160,7 +164,7 @@ def load_raw_data(filename):  # load the json data to list(dict()) for MATH 23K
     for i, s in enumerate(f):
         js += s
         i += 1
-        if i % 8 == 0:  # every 7 line is a json
+        if i % num == 0:  # every 7 line is a json
             data_d = json.loads(js)
             if "千米/小时" in data_d["equation"]:
                 data_d["equation"] = data_d["equation"][:-5]
