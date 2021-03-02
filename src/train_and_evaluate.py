@@ -642,7 +642,7 @@ class TreeEmbedding:  # the class save the tree
 
 def train_tree(input_batch, input_length, target_batch, target_length, nums_stack_batch, num_size_batch, generate_nums,
                encoder, predict, generate, merge, encoder_optimizer, predict_optimizer, generate_optimizer,
-               merge_optimizer, output_lang, num_pos, flag_batch, english=False):
+               merge_optimizer, output_lang, num_pos, flag_batch, parsed_num_pos_batch, english=False):
 
     # sequence mask for attention
     seq_mask = []
@@ -664,7 +664,7 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
     input_var = torch.LongTensor(input_batch).transpose(0, 1)
     # print(flag_batch, len(flag_batch))
     flag_var = torch.Tensor(flag_batch).transpose(0, 1) # (max_len x batch_size)
-
+    num_pos_var = torch.Tensor(parsed_num_pos_batch).transpose(0, 1)
     target = torch.LongTensor(target_batch).transpose(0, 1)
 
     padding_hidden = torch.FloatTensor([0.0 for _ in range(predict.hidden_size)]).unsqueeze(0)
@@ -681,6 +681,7 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
         padding_hidden = padding_hidden.cuda()
         num_mask = num_mask.cuda()
         flag_var = flag_var.cuda()
+        num_pos_var = num_pos_var.cuda()
 
     # Zero gradients of both optimizers
     encoder_optimizer.zero_grad()
@@ -689,7 +690,7 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
     merge_optimizer.zero_grad()
     # Run words through encoder
 
-    encoder_outputs, problem_output = encoder(input_var, input_length, flag_var)
+    encoder_outputs, problem_output = encoder(input_var, input_length, flag_var, num_pos_var)
     # Prepare input and output variables
     node_stacks = [[TreeNode(_)] for _ in problem_output.split(1, dim=0)]
 
@@ -771,13 +772,15 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
     return loss.item()  # , loss_0.item(), loss_1.item()
 
 
-def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, generate, merge, output_lang, num_pos, flag_batch,
+def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, generate, merge, output_lang, num_pos, flag_batch, parsed_num_pos_batch,
                   beam_size=5, english=False, max_length=MAX_OUTPUT_LENGTH):
 
     seq_mask = torch.ByteTensor(1, input_length).fill_(0)
     # Turn padded arrays into (batch_size x max_len) tensors, transpose into (max_len x batch_size)
     input_var = torch.LongTensor(input_batch).unsqueeze(1)
     flag_var = torch.Tensor(flag_batch).unsqueeze(1)
+    parsed_num_pos_var = torch.Tensor(parsed_num_pos_batch).unsqueeze(1)
+
     num_mask = torch.ByteTensor(1, len(num_pos) + len(generate_nums)).fill_(0)
 
     # Set to not-training mode to disable dropout
@@ -796,9 +799,10 @@ def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, ge
         padding_hidden = padding_hidden.cuda()
         num_mask = num_mask.cuda()
         flag_var = flag_var.cuda()
+        parsed_num_pos_var = parsed_num_pos_var.cuda()
     # Run words through encoder
 
-    encoder_outputs, problem_output = encoder(input_var, [input_length], flag_var, evaluating=True)
+    encoder_outputs, problem_output = encoder(input_var, [input_length], flag_var, parsed_num_pos_var, evaluating=True)
 
     # Prepare input and output variables
     node_stacks = [[TreeNode(_)] for _ in problem_output.split(1, dim=0)]

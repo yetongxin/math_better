@@ -40,6 +40,11 @@ fold_pairs.append(pairs[(fold_size * 4):])
 
 best_acc_fold = []
 
+def parse_num_pos(num_pos, seq_len, max_len):
+    arr = [0 for _ in range(max_len)]
+    for pos in num_pos:
+        arr[pos] = 1
+    return arr
 
 def writeFile(arr, fold, times):
   filename = 'error/' + str(fold) + '-' + str(times) + '.txt'
@@ -68,7 +73,7 @@ for fold in range(0, 5):
     set_input_lang(input_lang)
     set_output_lang(output_lang)
     # Initialize models
-    encoder = EncoderSeq3(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size,
+    encoder = EncoderSeq4(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size,
                          n_layers=n_layers)
     # encoder = EncoderRNNAttn(input_size=input_lang.n_words, embedding_size=embedding_size, hidden_size=hidden_size,
     #                          n_layers=n_layers, dropout=0.5, d_ff=2048, N=1)
@@ -109,15 +114,19 @@ for fold in range(0, 5):
         generate_scheduler.step()
         merge_scheduler.step()
         loss_total = 0
-        input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches, flag_batches = prepare_train_batch(train_pairs, batch_size)
+        input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches, flag_batches, parsed_num_pos_batches = prepare_train_batch(train_pairs, batch_size)
         print("fold:", fold + 1)
         print("epoch:", epoch + 1)
         start = time.time()
+        # print('input lengths', len(input_lengths), input_lengths)
+
         for idx in range(len(input_lengths)):
+            # print('num_pos :', num_pos_batches[idx][0], parsed_num_pos_batches[idx][0], input_lang.index2string(input_batches[idx][0]))
             loss = train_tree(
                 input_batches[idx], input_lengths[idx], output_batches[idx], output_lengths[idx],
                 num_stack_batches[idx], num_size_batches[idx], generate_num_ids, encoder, predict, generate, merge,
-                encoder_optimizer, predict_optimizer, generate_optimizer, merge_optimizer, output_lang, num_pos_batches[idx], flag_batch=flag_batches[idx])
+                encoder_optimizer, predict_optimizer, generate_optimizer, merge_optimizer, output_lang, num_pos_batches[idx], flag_batch=flag_batches[idx],
+                parsed_num_pos_batch=parsed_num_pos_batches[idx])
             loss_total += loss
 
         avg_loss = loss_total / len(input_lengths)
@@ -133,10 +142,11 @@ for fold in range(0, 5):
             start = time.time()
             error_list = []
             for test_batch in test_pairs:
-                # test_batch: (input_sentence_index, len(input_sentecnce), output_sentence_index, len(output_sentence), nums, num_pos, num_stack, flag)
+                # test_batch: (input_sentence_index, len(input_sentecnce), output_sentence_index, len(output_sentence), nums, num_pos, num_stack, flag, num_pos)
                 # print('evaluate tree', test_batch[7], to_one_hot(test_batch[7], len(test_batch[7]), len(test_batch[7])))
                 test_res = evaluate_tree(test_batch[0], test_batch[1], generate_num_ids, encoder, predict, generate,
-                                         merge, output_lang, test_batch[5], flag_batch=to_one_hot(test_batch[7], len(test_batch[7]), len(test_batch[7])), beam_size=beam_size)
+                                         merge, output_lang, test_batch[5], flag_batch=to_one_hot(test_batch[7], len(test_batch[7]), len(test_batch[7])),
+                                         parsed_num_pos_batch=parse_num_pos(test_batch[5], 0, test_batch[1]), beam_size=beam_size)
                 val_ac, equ_ac, gen_res, tar_res = compute_prefix_tree_result(test_res, test_batch[2], output_lang, test_batch[4], test_batch[6])
                 if val_ac:
                     value_ac += 1

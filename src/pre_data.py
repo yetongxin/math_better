@@ -862,6 +862,11 @@ def to_one_hot(arr, seq_len, max_len):
     arr = F.one_hot(arr, num_classes=len(flag_dict)).numpy()
     return arr
 
+def parse_num_pos(num_pos, seq_len, max_len):
+    arr = [0 for _ in range(max_len)]
+    for pos in num_pos:
+        arr[pos] = 1
+    return arr
 # prepare the batches
 def prepare_train_batch(pairs_to_batch, batch_size):
     pairs = copy.deepcopy(pairs_to_batch)
@@ -877,6 +882,7 @@ def prepare_train_batch(pairs_to_batch, batch_size):
     num_pos_batches = []
     num_size_batches = []
     flag_batches = []
+    parsed_num_pos_batches = []
     while pos + batch_size < len(pairs):
         batches.append(pairs[pos:pos+batch_size])
         pos += batch_size
@@ -900,6 +906,7 @@ def prepare_train_batch(pairs_to_batch, batch_size):
         num_pos_batch = []
         num_size_batch = []
         flag_batch = []
+        parsed_num_pos_batch = []
         for i, li, j, lj, num, num_pos, num_stack, flag in batch:
             num_batch.append(len(num))
             input_batch.append(pad_seq(i, li, input_len_max))
@@ -908,6 +915,7 @@ def prepare_train_batch(pairs_to_batch, batch_size):
             num_pos_batch.append(num_pos)
             num_size_batch.append(len(num_pos))
             flag_batch.append(to_one_hot(flag, li, input_len_max))
+            parsed_num_pos_batch.append(parse_num_pos(num_pos, li, input_len_max))
         input_batches.append(input_batch)
         nums_batches.append(num_batch)
         output_batches.append(output_batch)
@@ -915,7 +923,8 @@ def prepare_train_batch(pairs_to_batch, batch_size):
         num_pos_batches.append(num_pos_batch)
         num_size_batches.append(num_size_batch)
         flag_batches.append(flag_batch)
-    return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches, flag_batches
+        parsed_num_pos_batches.append(parsed_num_pos_batch)
+    return input_batches, input_lengths, output_batches, output_lengths, nums_batches, num_stack_batches, num_pos_batches, num_size_batches, flag_batches, parsed_num_pos_batches
 
 
 def get_num_stack(eq, output_lang, num_pos):
