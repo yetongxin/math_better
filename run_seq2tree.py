@@ -4,7 +4,7 @@ from src.models import *
 import time
 import torch.optim
 from src.expressions_transfer import *
-from src.global_vars import set_input_lang, set_output_lang
+from src.global_vars import set_input_lang, set_output_lang, device
 import os
 from src.pre_data import to_one_hot
 
@@ -96,10 +96,10 @@ for fold in range(0, 5):
 
     # Move models to GPU
     if USE_CUDA:
-        encoder.cuda()
-        predict.cuda()
-        generate.cuda()
-        merge.cuda()
+        encoder = encoder.to(device)
+        predict = predict.to(device)
+        generate = generate.to(device)
+        merge = merge.to(device)
 
     generate_num_ids = []
     for num in generate_nums:

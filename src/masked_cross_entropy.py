@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional
+from src.global_vars import device
 
 
 def sequence_mask(sequence_length, max_len=None):
@@ -9,14 +10,14 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range = torch.arange(0, max_len).long()
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     if sequence_length.is_cuda:
-        seq_range_expand = seq_range_expand.cuda()
+        seq_range_expand = seq_range_expand.to(device)
     seq_length_expand = (sequence_length.unsqueeze(1).expand_as(seq_range_expand))
     return seq_range_expand < seq_length_expand
 
 
 def masked_cross_entropy(logits, target, length):
     if torch.cuda.is_available():
-        length = torch.LongTensor(length).cuda()
+        length = torch.LongTensor(length).to(device)
     else:
         length = torch.LongTensor(length)
     """
@@ -55,7 +56,7 @@ def masked_cross_entropy(logits, target, length):
 
 def masked_cross_entropy_without_logit(logits, target, length):
     if torch.cuda.is_available():
-        length = torch.LongTensor(length).cuda()
+        length = torch.LongTensor(length).to(device)
     else:
         length = torch.LongTensor(length)
     """

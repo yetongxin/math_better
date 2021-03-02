@@ -7,6 +7,7 @@ import torch
 import torch.optim
 import torch.nn.functional as f
 import time
+from src.global_vars import device
 
 MAX_OUTPUT_LENGTH = 45
 MAX_INPUT_LENGTH = 120
@@ -249,13 +250,13 @@ def mask_num(encoder_outputs, decoder_input, embedding_size, nums_start, copy_nu
         indices[k] = num_pos[k][indices[k]]
     indices = torch.LongTensor(indices)
     if USE_CUDA:
-        indices = indices.cuda()
+        indices = indices.to(device)
     batch_size = decoder_input.size(0)
     sen_len = encoder_outputs.size(0)
     batch_num = torch.LongTensor(range(batch_size))
     batch_num = batch_num * sen_len
     if USE_CUDA:
-        batch_num = batch_num.cuda()
+        batch_num = batch_num.to(device)
     indices = batch_num + indices
     num_encoder = all_embedding.index_select(0, indices)
     return num_mask, num_encoder, num_mask_encoder
@@ -369,8 +370,8 @@ def get_all_number_encoder_outputs(encoder_outputs, num_pos, batch_size, num_siz
     masked_index = torch.ByteTensor(masked_index)
     masked_index = masked_index.view(batch_size, num_size, hidden_size)
     if USE_CUDA:
-        indices = indices.cuda()
-        masked_index = masked_index.cuda()
+        indices = indices.to(device)
+        masked_index = masked_index.to(device)
     all_outputs = encoder_outputs.transpose(0, 1).contiguous()
     all_embedding = all_outputs.view(-1, encoder_outputs.size(2))  # S x B x H -> (B x S) x H
     all_num = all_embedding.index_select(0, indices)
@@ -399,8 +400,8 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
     decoder.train()
 
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
 
     # Zero gradients of both optimizers
     encoder_optimizer.zero_grad()
@@ -418,13 +419,13 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
 
     # Move new Variables to CUDA
     if USE_CUDA:
-        all_decoder_outputs = all_decoder_outputs.cuda()
+        all_decoder_outputs = all_decoder_outputs.to(device)
 
     if random.random() < use_teacher_forcing:
         # Run through decoder one time step at a time
         for t in range(max_target_length):
             if USE_CUDA:
-                decoder_input = decoder_input.cuda()
+                decoder_input = decoder_input.to(device)
 
             decoder_output, decoder_hidden = decoder(
                 decoder_input, decoder_hidden, encoder_outputs, seq_mask)
@@ -436,7 +437,7 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
         beam_list = list()
         score = torch.zeros(batch_size)
         if USE_CUDA:
-            score = score.cuda()
+            score = score.to(device)
         beam_list.append(Beam(score, decoder_input, decoder_hidden, all_decoder_outputs))
         # Run through decoder one time step at a time
         for t in range(max_target_length):
@@ -445,9 +446,9 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
             all_hidden = torch.zeros(decoder_hidden.size(0), batch_size * beam_len, decoder_hidden.size(2))
             all_outputs = torch.zeros(max_target_length, batch_size * beam_len, decoder.output_size)
             if USE_CUDA:
-                beam_scores = beam_scores.cuda()
-                all_hidden = all_hidden.cuda()
-                all_outputs = all_outputs.cuda()
+                beam_scores = beam_scores.to(device)
+                all_hidden = all_hidden.to(device)
+                all_outputs = all_outputs.to(device)
 
             for b_idx in range(len(beam_list)):
                 decoder_input = beam_list[b_idx].input_var
@@ -456,8 +457,8 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
                 rule_mask = generate_rule_mask(decoder_input, num_batch, output_lang.word2index, batch_size,
                                                num_start, copy_nums, generate_nums, english)
                 if USE_CUDA:
-                    rule_mask = rule_mask.cuda()
-                    decoder_input = decoder_input.cuda()
+                    rule_mask = rule_mask.to(device)
+                    decoder_input = decoder_input.to(device)
 
                 decoder_output, decoder_hidden = decoder(
                     decoder_input, decoder_hidden, encoder_outputs, seq_mask)
@@ -488,7 +489,7 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
 
                 indices = torch.LongTensor(range(batch_size))
                 if USE_CUDA:
-                    indices = indices.cuda()
+                    indices = indices.to(device)
                 indices += temp_beam_pos * batch_size
 
                 temp_hidden = all_hidden.index_select(1, indices)
@@ -503,7 +504,7 @@ def train_attn(input_batch, input_length, target_batch, target_length, num_batch
     # Loss calculation and backpropagation
 
     if USE_CUDA:
-        target = target.cuda()
+        target = target.to(device)
 
     loss = masked_cross_entropy(
         all_decoder_outputs.transpose(0, 1).contiguous(),  # -> batch x seq
@@ -534,8 +535,8 @@ def evaluate_attn(input_seq, input_length, num_list, copy_nums, generate_nums, e
     # Turn padded arrays into (batch_size x max_len) tensors, transpose into (max_len x batch_size)
     input_var = torch.LongTensor(input_seq).unsqueeze(1)
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
 
     # Set to not-training mode to disable dropout
     encoder.eval()
@@ -566,8 +567,8 @@ def evaluate_attn(input_seq, input_length, num_list, copy_nums, generate_nums, e
         hidden_size_2 = decoder_hidden.size(2)
         all_hidden = torch.zeros(beam_len, hidden_size_0, 1, hidden_size_2)
         if USE_CUDA:
-            beam_scores = beam_scores.cuda()
-            all_hidden = all_hidden.cuda()
+            beam_scores = beam_scores.to(device)
+            all_hidden = all_hidden.to(device)
         all_outputs = []
         current_idx = -1
 
@@ -581,8 +582,8 @@ def evaluate_attn(input_seq, input_length, num_list, copy_nums, generate_nums, e
             # rule_mask = generate_rule_mask(decoder_input, [num_list], output_lang.word2index,
             #                                1, num_start, copy_nums, generate_nums, english)
             if USE_CUDA:
-                # rule_mask = rule_mask.cuda()
-                decoder_input = decoder_input.cuda()
+                # rule_mask = rule_mask.to(device)
+                decoder_input = decoder_input.to(device)
 
             decoder_output, decoder_hidden = decoder(
                 decoder_input, decoder_hidden, encoder_outputs, seq_mask)
@@ -643,6 +644,10 @@ class TreeEmbedding:  # the class save the tree
 def train_tree(input_batch, input_length, target_batch, target_length, nums_stack_batch, num_size_batch, generate_nums,
                encoder, predict, generate, merge, encoder_optimizer, predict_optimizer, generate_optimizer,
                merge_optimizer, output_lang, num_pos, flag_batch, parsed_num_pos_batch, english=False):
+    encoder = encoder.to(device)
+    predict = predict.to(device)
+    generate = generate.to(device)
+    merge = merge.to(device)
 
     # sequence mask for attention
     seq_mask = []
@@ -676,12 +681,12 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
     merge.train()
 
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
-        padding_hidden = padding_hidden.cuda()
-        num_mask = num_mask.cuda()
-        flag_var = flag_var.cuda()
-        num_pos_var = num_pos_var.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
+        padding_hidden = padding_hidden.to(device)
+        num_mask = num_mask.to(device)
+        flag_var = flag_var.to(device)
+        num_pos_var = num_pos_var.to(device)
 
     # Zero gradients of both optimizers
     encoder_optimizer.zero_grad()
@@ -718,7 +723,7 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
         target_t, generate_input = generate_tree_input(target[t].tolist(), outputs, nums_stack_batch, num_start, unk)
         target[t] = target_t
         if USE_CUDA:
-            generate_input = generate_input.cuda()
+            generate_input = generate_input.to(device)
         left_child, right_child, node_label = generate(current_embeddings, generate_input, current_context)
         left_childs = []
         for idx, l, r, node_stack, i, o in zip(range(batch_size), left_child.split(1), right_child.split(1),
@@ -750,9 +755,9 @@ def train_tree(input_batch, input_length, target_batch, target_length, nums_stac
 
     target = target.transpose(0, 1).contiguous()
     if USE_CUDA:
-        # all_leafs = all_leafs.cuda()
-        all_node_outputs = all_node_outputs.cuda()
-        target = target.cuda()
+        # all_leafs = all_leafs.to(device)
+        all_node_outputs = all_node_outputs.to(device)
+        target = target.to(device)
 
     # op_target = target < num_start
     # loss_0 = masked_cross_entropy_without_logit(all_leafs, op_target.long(), target_length)
@@ -794,12 +799,12 @@ def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, ge
     batch_size = 1
 
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
-        padding_hidden = padding_hidden.cuda()
-        num_mask = num_mask.cuda()
-        flag_var = flag_var.cuda()
-        parsed_num_pos_var = parsed_num_pos_var.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
+        padding_hidden = padding_hidden.to(device)
+        num_mask = num_mask.to(device)
+        flag_var = flag_var.to(device)
+        parsed_num_pos_var = parsed_num_pos_var.to(device)
     # Run words through encoder
 
     encoder_outputs, problem_output = encoder(input_var, [input_length], flag_var, parsed_num_pos_var, evaluating=True)
@@ -870,7 +875,7 @@ def evaluate_tree(input_batch, input_length, generate_nums, encoder, predict, ge
                 if out_token < num_start:
                     generate_input = torch.LongTensor([out_token])
                     if USE_CUDA:
-                        generate_input = generate_input.cuda()
+                        generate_input = generate_input.to(device)
                     left_child, right_child, node_label = generate(current_embeddings, generate_input, current_context)
 
                     current_node_stack[0].append(TreeNode(right_child))
@@ -935,10 +940,10 @@ def topdown_train_tree(input_batch, input_length, target_batch, target_length, n
     generate.train()
 
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
-        padding_hidden = padding_hidden.cuda()
-        num_mask = num_mask.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
+        padding_hidden = padding_hidden.to(device)
+        num_mask = num_mask.to(device)
 
     # Zero gradients of both optimizers
     encoder_optimizer.zero_grad()
@@ -973,7 +978,7 @@ def topdown_train_tree(input_batch, input_length, target_batch, target_length, n
         target_t, generate_input = generate_tree_input(target[t].tolist(), outputs, nums_stack_batch, num_start, unk)
         target[t] = target_t
         if USE_CUDA:
-            generate_input = generate_input.cuda()
+            generate_input = generate_input.to(device)
         left_child, right_child, node_label = generate(current_embeddings, generate_input, current_context)
         for idx, l, r, node_stack, i in zip(range(batch_size), left_child.split(1), right_child.split(1),
                                             node_stacks, target[t].tolist()):
@@ -991,9 +996,9 @@ def topdown_train_tree(input_batch, input_length, target_batch, target_length, n
 
     target = target.transpose(0, 1).contiguous()
     if USE_CUDA:
-        # all_leafs = all_leafs.cuda()
-        all_node_outputs = all_node_outputs.cuda()
-        target = target.cuda()
+        # all_leafs = all_leafs.to(device)
+        all_node_outputs = all_node_outputs.to(device)
+        target = target.to(device)
 
     # op_target = target < num_start
     # loss_0 = masked_cross_entropy_without_logit(all_leafs, op_target.long(), target_length)
@@ -1031,10 +1036,10 @@ def topdown_evaluate_tree(input_batch, input_length, generate_nums, encoder, pre
     batch_size = 1
 
     if USE_CUDA:
-        input_var = input_var.cuda()
-        seq_mask = seq_mask.cuda()
-        padding_hidden = padding_hidden.cuda()
-        num_mask = num_mask.cuda()
+        input_var = input_var.to(device)
+        seq_mask = seq_mask.to(device)
+        padding_hidden = padding_hidden.to(device)
+        num_mask = num_mask.to(device)
     # Run words through encoder
 
     encoder_outputs, problem_output = encoder(input_var, [input_length])
@@ -1102,7 +1107,7 @@ def topdown_evaluate_tree(input_batch, input_length, generate_nums, encoder, pre
                 if out_token < num_start:
                     generate_input = torch.LongTensor([out_token])
                     if USE_CUDA:
-                        generate_input = generate_input.cuda()
+                        generate_input = generate_input.to(device)
                     left_child, right_child, node_label = generate(current_embeddings, generate_input, current_context)
 
                     current_node_stack[0].append(TreeNode(right_child))
