@@ -7,11 +7,14 @@ from src.expressions_transfer import *
 from src.global_vars import set_input_lang, set_output_lang
 import os
 from src.pre_data import to_one_hot
+import json
 
 if not os.path.exists('error'):
     os.makedirs('error')
 if not os.path.exists('models'):
     os.makedirs('models')
+if not os.path.exists('logs'):
+    os.makedirs('logs')
 batch_size = 64
 embedding_size = 512 # todo: 128 linear->512
 hidden_size = 512
@@ -48,6 +51,15 @@ def writeFile(arr, fold, times):
   f.writelines(arr)
   f.close()
 
+def getTemplate(tmpList):
+    op = ['+', '-', '*', '/', '^']
+    arr = []
+    for item in tmpList:
+        if item in op:
+            arr.append(item)
+        else:
+            arr.appedn('N')
+    return ''.join(arr)
 # test: 从第2个fold开始计算
 for fold in range(0, 5):
     pairs_tested = []
@@ -103,6 +115,9 @@ for fold in range(0, 5):
     evalate_times = 0
     pre_accuracy = 0
     best_accuracy = 0
+    all_epoch_losses = []
+    all_iteration_losses = [], iteration = 0
+    all_template = dict(),  right_template = dict()
     for epoch in range(n_epochs):
         encoder_scheduler.step()
         predict_scheduler.step()
@@ -118,10 +133,15 @@ for fold in range(0, 5):
                 input_batches[idx], input_lengths[idx], output_batches[idx], output_lengths[idx],
                 num_stack_batches[idx], num_size_batches[idx], generate_num_ids, encoder, predict, generate, merge,
                 encoder_optimizer, predict_optimizer, generate_optimizer, merge_optimizer, output_lang, num_pos_batches[idx], flag_batch=flag_batches[idx])
+            if iteration % 100 == 0:
+                all_iteration_losses.append(loss)
+            iteration += 1
             loss_total += loss
 
         avg_loss = loss_total / len(input_lengths)
+        all_epoch_losses.append(avg_loss)
         print("loss:", avg_loss)
+        print('epoch iteration num'， iteration)
         print("training time", time_since(time.time() - start))
         print("--------------------------------")
         # 0.0452444252413537
@@ -141,7 +161,16 @@ for fold in range(0, 5):
                 if val_ac:
                     value_ac += 1
                 if equ_ac:
-                    equation_ac += 1
+                    equation_ac += 1\
+                # 各个template准确率
+                template_class = getTemplate(tar_res)
+                if template_class in all_template:
+                    all_template[template_class] += 1
+                    right_template[template_class] += val_ac
+                else:
+                    all_template[template_class] = 1
+                    right_template[template_class] += val_ac
+
                 if val_ac == False and equ_ac == False:
                   tmp = input_lang.index2string(test_batch[0])
                   error_list.append(tmp + ' '.join(map(str, gen_res)) + '  real:' + ' '.join(map(str, tar_res)) + '\n')
@@ -159,6 +188,12 @@ for fold in range(0, 5):
             torch.save(merge.state_dict(), "models/merge")
             if epoch == n_epochs - 1:
                 best_acc_fold.append((equation_ac, value_ac, eval_total))
+
+    print('all epoch losses:',all_epoch_losses)
+    loss_draw_obj = {'loss_epoch': all_epoch_losses, 'loss_iter': all_iteration_losses}
+    json.dump(loss_draw_obj, open('logs/loss' + str(fold) + '.json','w'))
+    template_acc_obj = {'all_template': all_template, 'right_template': right_template}
+    json.dump(template_acc_obj, open('logs/template_acc' + str(fold) + '.json','w'))
 
 a, b, c = 0, 0, 0
 for bl in range(len(best_acc_fold)):
